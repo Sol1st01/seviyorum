@@ -16,8 +16,8 @@
         #ui-container { position: relative; z-index: 2; text-align: center; pointer-events: none; }
         #quote { font-size: 18px; margin-bottom: 20px; line-height: 1.4; opacity: 0.9; }
         #username { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 14px; opacity: 0.7; z-index: 2; }
-        #-text {
-            position: absolute; font-size: 80px; font-weight: bold;
+        #combo-text {
+            position: absolute; font-size: 500px; font-weight: bold;
             opacity: 0; transition: transform 0.1s ease-out, opacity 0.1s ease-out;
             pointer-events: none; z-index: 3; white-space: nowrap;
         }
@@ -32,7 +32,7 @@
         <div id="quote">Seni<br>Çok<br>Seviyorum</div>
     </div>
     
-    <div id="combo-text">AŞIĞIM<br>Sana!</div>
+    <div id="combo-text">AŞIĞIM SANA!</div>
 
     <div id="username">Can'dan Semra'ya</div>
 
@@ -161,13 +161,13 @@
             }
 
             if (clickCount >= AYARLAR.kombo.esik) {
-                TextEl.style.color = AYARLAR.kombo.yaziRengi;
-                TextEl.style.left = "50%";
-                TextEl.style.top = "50%";
-                TextEl.style.transform = `translate(-50%, -50%) scale(${1 + Math.random()*0.3}) rotate(${(Math.random()-0.5)*15}deg)`;
-                TextEl.classList.add('active');
-                clearTimeout(Timeout);
-                Timeout = setTimeout(() => TextEl.classList.remove('active'), AYARLAR.kombo.ekranSureMs);
+                comboTextEl.style.color = AYARLAR.kombo.yaziRengi;
+                comboTextEl.style.left = "50%";
+                comboTextEl.style.top = "50%";
+                comboTextEl.style.transform = `translate(-50%, -50%) scale(${1 + Math.random()*0.3}) rotate(${(Math.random()-0.5)*15}deg)`;
+                comboTextEl.classList.add('active');
+                clearTimeout(comboTimeout);
+                comboTimeout = setTimeout(() => comboTextEl.classList.remove('active'), AYARLAR.kombo.ekranSureMs);
             }
         }
 
