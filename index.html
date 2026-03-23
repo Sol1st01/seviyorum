@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kırmızı Kalp Dağıtma</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #000;
+            display: flex; justify-content: center; align-items: center;
+            color: white; font-family: 'Courier New', Courier, monospace;
+            user-select: none; -webkit-user-select: none;
+        }
+        canvas { position: absolute; top: 0; left: 0; z-index: 1; }
+        #ui-container { position: relative; z-index: 2; text-align: center; pointer-events: none; }
+        #quote { font-size: 18px; margin-bottom: 20px; line-height: 1.4; opacity: 0.9; }
+        #username { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 14px; opacity: 0.7; z-index: 2; }
+        #combo-text {
+            position: absolute; font-size: 80px; font-weight: bold;
+            opacity: 0; transition: transform 0.1s ease-out, opacity 0.1s ease-out;
+            pointer-events: none; z-index: 3; white-space: nowrap;
+        }
+        #combo-text.active { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <canvas id="stage"></canvas>
+
+    <div id="ui-container">
+        <div id="quote">Seni<br>Çok<br>Seviyorum</div>
+    </div>
+    
+    <div id="combo-text">AŞIĞIM SANA!</div>
+
+    <div id="username">Can'dan Semra'ya</div>
+
+    <script>
+        // --- GÜNCELLENMİŞ AYARLAR ---
+        const AYARLAR = {
+            kalp: {
+                noktaSayisi: 4500,       // İçini doldurmak için nokta sayısını artırdım
+                boyut: 10,
+                renk: '#ff69b4',        // SAF KIRMIZI
+                noktaBoyutu: 0.8       // TANELER DAHA KÜÇÜK (0.5 - 1.2 arası ideal)
+            },
+            mermi: { sayi: 1, hiz: 9, boyut: 3, renk: 'white' },
+            kombo: { esik: 5, sureMs: 400, yaziRengi: '#ff0000', ekranSureMs: 800 }
+        };
+
+        const canvas = document.getElementById('stage');
+        const ctx = canvas.getContext('2d');
+        const comboTextEl = document.getElementById('combo-text');
+        
+        let width, height, centerX, centerY;
+        let particles = [];
+        let bullets = [];
+        let lastClickTime = 0, clickCount = 0, comboTimeout;
+
+        // Kalp matematiksel formülü
+        function getHeartPoint(t) {
+            const x = 16 * Math.pow(Math.sin(t), 3);
+            const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+            return { x: x * AYARLAR.kalp.boyut, y: y * AYARLAR.kalp.boyut };
+        }
+
+        class Particle {
+            constructor(x, y) {
+                this.homeX = x + centerX;
+                this.homeY = y + centerY;
+                this.x = this.homeX + (Math.random() - 0.5) * 100;
+                this.y = this.homeY + (Math.random() - 0.5) * 100;
+                this.vx = 0; this.vy = 0;
+                this.radius = Math.random() * AYARLAR.kalp.noktaBoyutu + 0.3;
+                this.friction = 0.95;
+                this.spring = 0.015;
+                this.color = AYARLAR.kalp.renk;
+            }
+            update() {
+                let dx = this.homeX - this.x;
+                let dy = this.homeY - this.y;
+                this.vx += dx * this.spring;
+                this.vy += dy * this.spring;
+                this.vx *= this.friction;
+                this.vy *= this.friction;
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        class Bullet {
+            constructor(startX, startY, targetX, targetY) {
+                this.x = startX; this.y = startY;
+                this.dead = false;
+                const angle = Math.atan2(targetY - startY, targetX - startX);
+                this.vx = Math.cos(angle) * AYARLAR.mermi.hiz;
+                this.vy = Math.sin(angle) * AYARLAR.mermi.hiz;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                if (this.x < -50 || this.x > width + 50 || this.y < -50 || this.y > height + 50) this.dead = true;
+                particles.forEach(p => {
+                    let dx = p.x - this.x, dy = p.y - this.y;
+                    if (Math.sqrt(dx*dx + dy*dy) < 35) {
+                        p.vx += this.vx * 0.6; p.vy += this.vy * 0.6;
+                    }
+                });
+            }
+            draw() {
+                ctx.fillStyle = AYARLAR.mermi.renk;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, AYARLAR.mermi.boyut, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function init() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            centerX = width / 2; centerY = height / 2;
+            particles = [];
+            
+            // İÇİ DOLU KALP OLUŞTURMA MANTIĞI
+            for (let i = 0; i < AYARLAR.kalp.noktaSayisi; i++) {
+                const t = Math.random() * Math.PI * 2;
+                const basePoint = getHeartPoint(t);
+                
+                // Noktayı merkeze doğru rastgele bir oranda çekerek içini dolduruyoruz
+                const r = Math.sqrt(Math.random()); 
+                const rx = basePoint.x * r + (Math.random() - 0.5) * 10;
+                const ry = basePoint.y * r + (Math.random() - 0.5) * 10;
+                
+                particles.push(new Particle(rx, ry));
+            }
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+            ctx.fillRect(0, 0, width, height);
+            bullets = bullets.filter(b => !b.dead);
+            bullets.forEach(b => { b.update(); b.draw(); });
+            particles.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(animate);
+        }
+
+        function handleInput(x, y) {
+            const now = Date.now();
+            if (now - lastClickTime < AYARLAR.kombo.sureMs) clickCount++;
+            else clickCount = 1;
+            lastClickTime = now;
+
+            for (let i = 0; i < AYARLAR.mermi.sayi; i++) {
+                bullets.push(new Bullet(x + (Math.random()-0.5)*20, y + (Math.random()-0.5)*20, centerX, centerY));
+            }
+
+            if (clickCount >= AYARLAR.kombo.esik) {
+                comboTextEl.style.color = AYARLAR.kombo.yaziRengi;
+                comboTextEl.style.left = "50%";
+                comboTextEl.style.top = "50%";
+                comboTextEl.style.transform = `translate(-50%, -50%) scale(${1 + Math.random()*0.3}) rotate(${(Math.random()-0.5)*15}deg)`;
+                comboTextEl.classList.add('active');
+                clearTimeout(comboTimeout);
+                comboTimeout = setTimeout(() => comboTextEl.classList.remove('active'), AYARLAR.kombo.ekranSureMs);
+            }
+        }
+
+        window.addEventListener('mousedown', e => handleInput(e.clientX, e.clientY));
+        window.addEventListener('touchstart', e => { e.preventDefault(); handleInput(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+        window.addEventListener('resize', init);
+
+        init();
+        animate();
+    </script>
+</body>
+</html>
